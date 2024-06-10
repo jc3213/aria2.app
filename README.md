@@ -1,2 +1,5 @@
-# aria2.app
-A light-weight aria2 task manager via JSON-RPC 
+## About
+A light-weight aria2 taskmanager that uses Javascript library `aria2.js` via JSON-RPC
+
+| [Download aria2.js](https://github.com/jc3213/aria2.js) | [Try the Aria2 Task Manager](https://jc3213.github.io/aria2.app/) |
+| - | - |
