@@ -92,7 +92,7 @@ body > #menu {
 }
 
 #adduri > :first-child {
-    margin-top: 0px;
+    margin: 0px 0px 5px;
 }
 
 #status {
