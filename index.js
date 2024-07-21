@@ -18,26 +18,24 @@ NodeList.prototype.disposition = function (json) {
     return result;
 }
 
-document.addEventListener('click', ({target}) => {
-    var {id} = target;
-    if (id === 'proxy_btn') {
-        target.previousElementSibling.value = localStorage.aria2Proxy;
-        return;
-    }
-    if (id === 'enter_btn') {
-        return downloadSubmit();
-    }
-    if (id === 'upload_btn') {
-        return uploader.click();
-    }
-    if (id === 'commit_btn') {
-        return managerOptionsSave();
-    }
-    if (id !== 'options_btn' && !setting.contains(target)) {
-        return manager.remove('setting');
-    }
-    if (id !== 'download_btn' && !adduri.contains(target)) {
-        return manager.remove('adduri');
+document.addEventListener('click', (event) => {
+    switch (event.target.id) {
+        case 'proxy_btn':
+            event.target.previousElementSibling.value = localStorage.aria2Proxy;
+            break;
+        case 'enter_btn':
+            downloadSubmit();
+            break;
+        case 'commit_btn':
+            managerOptionsSave();
+            break;
+        default:
+            if (event.target.id !== 'options_btn' && !setting.contains(event.target)) {
+                return manager.remove('setting');
+            }
+            if (event.target.id !== 'download_btn' && !adduri.contains(event.target)) {
+                return manager.remove('adduri');
+            }
     }
 });
 

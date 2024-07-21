@@ -78,10 +78,17 @@ body > #menu {
     border-style: outset;
 }
 
-.jsonrpc {
+.jsonrpc, .entries {
     display: grid;
     grid-column-gap: 3px;
+}
+
+.jsonrpc {
     grid-template-columns: auto 1fr 1fr auto;
+}
+
+.entries {
+    grid-template-columns: 1fr auto auto 0px;
 }
 
 #adduri > :first-child {
