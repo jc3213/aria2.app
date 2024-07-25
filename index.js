@@ -21,7 +21,7 @@ NodeList.prototype.disposition = function (json) {
 document.addEventListener('click', (event) => {
     switch (event.target.id) {
         case 'proxy_btn':
-            event.target.previousElementSibling.value = localStorage.aria2Proxy;
+            event.target.previousElementSibling.value = localStorage.aria2Proxy || '';
             break;
         case 'enter_btn':
             downloadSubmit();
@@ -29,13 +29,6 @@ document.addEventListener('click', (event) => {
         case 'commit_btn':
             managerOptionsSave();
             break;
-        default:
-            if (event.target.id !== 'options_btn' && !setting.contains(event.target)) {
-                return manager.remove('setting');
-            }
-            if (event.target.id !== 'download_btn' && !adduri.contains(event.target)) {
-                return manager.remove('adduri');
-            }
     }
 });
 
@@ -123,7 +116,11 @@ setting.addEventListener('change', (event) => {
 async function aria2Initial() {
     await aria2ClientSetup();
     var [global, version] = await aria2RPC.call({method: 'aria2.getGlobalOption'}, {method: 'aria2.getVersion'});
-    aria2Global = options = download.disposition(taskOptionsSetUp(global.result));
+    var options = global.result;
+    options['min-split-size'] = getFileSize(options['min-split-size']);
+    options['max-download-limit'] = getFileSize(options['max-download-limit']);
+    options['max-upload-limit'] = getFileSize(options['max-upload-limit']);
+    aria2Global = download.disposition(options);
     document.querySelector('#aria2_ver').textContent = version.result.version;
 }
 
