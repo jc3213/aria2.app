@@ -34,10 +34,12 @@ document.addEventListener('click', (event) => {
 
 function managerDownload() {
     manager.toggle('adduri');
+    manager.remove('setting')
 }
 
 function managerOptions() {
     manager.toggle('setting');
+    manager.remove('adduri');
 }
 
 function managerOptionsSave() {
