@@ -86,16 +86,16 @@ async function downloadSubmit() {
     manager.remove('adduri');
 }
 
-uploader.addEventListener('change', async ({target}) => {
-    var file = target.files[0];
+uploader.addEventListener('change', async (event) => {
+    var file = event.target.files[0];
     var b64encode = await getFileData(file);
     if (file.name.endsWith('torrent')){
-        await aria2RPC.call({method: 'aria2.addTorrent', params: [b64encode]});
+        await aria2RPC.call({method: 'aria2.addTorrent', params: [b64encode, [], aria2Global]});
     }
     else {
         await aria2RPC.call({method: 'aria2.addMetalink', params: [b64encode, aria2Global]});
     }
-    target.value = '';
+    event.target.value = '';
     manager.remove('adduri');
 });
 
