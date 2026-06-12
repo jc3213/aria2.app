@@ -33,7 +33,9 @@ jobs:
             assets:
               - 'index.html'
               - 'index.js'
-              - '
+              - 'app.js'
+              - 'package.json'
+              - 'i18n/**'
 
   assets:
     needs: check
