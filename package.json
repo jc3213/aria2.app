@@ -1,7 +1,7 @@
 {
     "name": "aria2-task-manager",
     "version": "1.0.0",
-    "main": "app/app.js",
+    "main": "app.js",
     "scripts": {
         "start": "electron .",
         "dist": "electron-builder"
