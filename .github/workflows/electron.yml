@@ -36,13 +36,13 @@ jobs:
 
   assets:
     needs: check
-    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v5
 
       - name: Fetch external JS/CSS
+        if: needs.check.outputs.changed == 'true'
         run: |
           curl -L -o aria2.js https://jc3213.github.io/aria2.js/aria2.js
           curl -L -o common.css https://jc3213.github.io/download_with_aria2/chromium/pages/common.css
@@ -50,12 +50,11 @@ jobs:
           curl -L -o popup.js https://jc3213.github.io/download_with_aria2/chromium/pages/popup/popup.js
 
       - name: Commit updated assets
+        if: needs.check.outputs.changed == 'true'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add aria2.js common.css popup.css popup.js
-
           git diff --cached --quiet || git commit -m "Sync external assets"
           git push
 
