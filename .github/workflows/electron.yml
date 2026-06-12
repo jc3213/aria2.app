@@ -33,9 +33,6 @@ jobs:
             assets:
               - 'index.html'
               - 'index.js'
-              - 'app.js'
-              - 'package.json'
-              - 'i18n/**'
 
   assets:
     needs: check
@@ -59,7 +56,7 @@ jobs:
 
           git add aria2.js common.css popup.css popup.js
 
-          git diff --cached --quiet || git commit -m "Sync external assets [skip-sync]"
+          git diff --cached --quiet || git commit -m "Sync external assets"
           git push
 
   prepare:
