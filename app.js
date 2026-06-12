@@ -1,10 +1,11 @@
-const { app, BrowserWindow } = require('electron');
+const electron = require('electron');
+const app = electron.app;
+const BrowserWindow = electron.BrowserWindow;
 const path = require('path');
 
 let newWindow = null;
 
 app.whenReady().then(() => {
-    const indexPath = path.join(app.getAppPath(), 'app/index.html');
     newWindow = new BrowserWindow({
         width: 1310,
         height: 1156,
@@ -15,7 +16,7 @@ app.whenReady().then(() => {
             nodeIntegration: false
         }
     });
-    newWindow.loadFile(indexPath);
+    newWindow.loadFile('index.html');
     newWindow.on('closed', () => {
         newWindow = null;
     });
