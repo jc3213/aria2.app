@@ -15,6 +15,7 @@
         "publish": null,
         "files": [
             "app.js",
+            "aria2.js",
             "index.html",
             "index.js",
             "popup.js",
