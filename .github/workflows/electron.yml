@@ -18,31 +18,22 @@ permissions:
   contents: write
 
 jobs:
-  check:
+  assets:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.filter.outputs.assets }}
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - uses: dorny/paths-filter@v4
+      - name: Detect asset changes
         id: filter
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             assets:
               - 'index.html'
               - 'index.js'
 
-  assets:
-    needs: check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
-
       - name: Fetch external JS/CSS
-        if: needs.check.outputs.changed == 'true'
+        if: steps.filter.outputs.assets == 'true'
         run: |
           curl -L -o aria2.js https://jc3213.github.io/aria2.js/aria2.js
           curl -L -o common.css https://jc3213.github.io/download_with_aria2/chromium/pages/common.css
@@ -50,7 +41,7 @@ jobs:
           curl -L -o popup.js https://jc3213.github.io/download_with_aria2/chromium/pages/popup/popup.js
 
       - name: Commit updated assets
-        if: needs.check.outputs.changed == 'true'
+        if: steps.filter.outputs.assets == 'true'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -59,14 +50,11 @@ jobs:
           git push
 
   prepare:
-    needs: check
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.pkg.outputs.version }}
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
       - name: Read version
         id: pkg
@@ -92,19 +80,19 @@ jobs:
           gh release create "$VERSION" --title "$VERSION" --notes "Auto release $VERSION"
 
   build:
-    needs: [assets, prepare]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+
+    needs: [assets, prepare]
 
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       VERSION: ${{ needs.prepare.outputs.version }}
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v5
         with:
@@ -118,7 +106,6 @@ jobs:
 
       - name: Upload installers (Linux/macOS)
         if: runner.os != 'Windows'
-        shell: bash
         run: |
           find dist -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.exe" \) | while read file; do
             gh release upload "$VERSION" "$file" --clobber
