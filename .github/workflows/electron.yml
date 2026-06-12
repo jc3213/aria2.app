@@ -18,8 +18,10 @@ permissions:
   contents: write
 
 jobs:
-  assets:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
     steps:
       - uses: actions/checkout@v5
 
@@ -48,13 +50,6 @@ jobs:
           git add aria2.js common.css popup.css popup.js
           git diff --cached --quiet || git commit -m "Sync external assets"
           git push
-
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.pkg.outputs.version }}
-    steps:
-      - uses: actions/checkout@v5
 
       - name: Read version
         id: pkg
@@ -85,7 +80,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
-    needs: [assets, prepare]
+    needs: prepare
 
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
