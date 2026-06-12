@@ -18,12 +18,12 @@ permissions:
   contents: write
 
 jobs:
-  assets:
+  prepare:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: Detect asset changes
+      - name: Detect code changes
         id: filter
         uses: dorny/paths-filter@v4
         with:
@@ -32,7 +32,7 @@ jobs:
               - 'index.html'
               - 'index.js'
 
-      - name: Fetch external JS/CSS
+      - name: Fetch external assets
         if: steps.filter.outputs.assets == 'true'
         run: |
           curl -L -o aria2.js https://jc3213.github.io/aria2.js/aria2.js
@@ -49,24 +49,15 @@ jobs:
           git diff --cached --quiet || git commit -m "Sync external assets"
           git push
 
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.pkg.outputs.version }}
-    steps:
-      - uses: actions/checkout@v5
-
       - name: Read version
-        id: pkg
         run: |
           VERSION=$(jq -r .version package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Delete old release if exists
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.pkg.outputs.version }}"
           if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release delete "$VERSION" -y || true
             git push origin ":refs/tags/$VERSION" || true
@@ -76,20 +67,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.pkg.outputs.version }}"
           gh release create "$VERSION" --title "$VERSION" --notes "Auto release $VERSION"
 
   build:
+    needs: prepare
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
-    needs: [assets, prepare]
-
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      VERSION: ${{ needs.prepare.outputs.version }}
 
     steps:
       - uses: actions/checkout@v5
@@ -115,14 +103,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $version = $env:VERSION
-
-          $zip = "aria2-task-manager-$version-win64.zip"
+          $zip = "aria2-task-manager-$env:VERSION-win64.zip"
           Compress-Archive "dist/win-unpacked/*" $zip -Force
 
           $setup = Get-ChildItem dist -Filter "*Setup*.exe" | Select-Object -First 1
-          $exe = "aria2-task-manager-$version-win64.exe"
+          $exe = "aria2-task-manager-$env:VERSION-win64.exe"
           Copy-Item $setup.FullName $exe -Force
 
-          gh release upload $version $zip --clobber
-          gh release upload $version $exe --clobber
+          gh release upload $env:VERSION $zip --clobber
+          gh release upload $env:VERSION $exe --clobber
