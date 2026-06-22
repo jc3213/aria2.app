@@ -37,10 +37,10 @@ jobs:
       - name: Fetch external JS/CSS
         if: steps.filter.outputs.assets == 'true'
         run: |
-          curl -L -o aria2.js https://jc3213.github.io/aria2.js/aria2.js
-          curl -L -o common.css https://jc3213.github.io/download_with_aria2/chromium/pages/common.css
-          curl -L -o popup.css https://jc3213.github.io/download_with_aria2/chromium/pages/popup/popup.css
-          curl -L -o popup.js https://jc3213.github.io/download_with_aria2/chromium/pages/popup/popup.js
+          curl -L -o aria2.js https://raw.githubusercontent.com/jc3213/aria2.js/refs/heads/main/src/aria2.js
+          curl -L -o common.css https://raw.githubusercontent.com/jc3213/download_with_aria2/refs/heads/main/chromium/pages/common.css
+          curl -L -o popup.css https://raw.githubusercontent.com/jc3213/download_with_aria2/refs/heads/main/chromium/pages/popup/popup.css
+          curl -L -o popup.js https://raw.githubusercontent.com/jc3213/download_with_aria2/refs/heads/main/chromium/pages/popup/popup.js
 
       - name: Commit updated assets
         if: steps.filter.outputs.assets == 'true'
