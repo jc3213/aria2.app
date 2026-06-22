@@ -4,8 +4,10 @@ const hotkeyCombo = {};
 for (let i = 0, l = hotkeyMap.length; i < l; i++) {
     let el = hotkeyMap[i];
     let keys = el.getAttribute('hotkey').toLowerCase().split('\n');
+
     for (let j = 0, m = keys.length; j < m; j++) {
         let k = keys[j].trim();
+
         if (k) {
             hotkeyCombo[k] = el;
         }
@@ -14,18 +16,24 @@ for (let i = 0, l = hotkeyMap.length; i < l; i++) {
 
 document.addEventListener('keydown', (event) => {
     let keys = [];
+
     if (event.ctrlKey) {
         keys.push('ctrl');
     }
+
     if (event.altKey) {
         keys.push('alt');
     }
+
     if (event.shiftKey) {
         keys.push('shift');
     }
+
     keys.push(event.key.toLowerCase());
+
     let combo = keys.join('+');
     let hotkey = hotkeyCombo[combo];
+
     if (hotkey) {
         event.preventDefault();
         hotkey.click();
@@ -76,8 +84,8 @@ downPane.innerHTML = `
     <h4 i18n="task_referer">Referer</h4>
     <div class="flex">
         <input type="text">
-        <button id="down-file" i18n="task_base64">Upload</button>
-        <button id="down-url" i18n="task_submit">Submit</button>
+        <button id="down-files" i18n="task_base64">Upload</button>
+        <button id="down-urls" i18n="task_submit">Submit</button>
         <input type="file" accept=".torrent, .metalink, .meta4" multiple class="hidden">
     </div>
 </div>
@@ -320,6 +328,7 @@ let menuTree = menuPane.children;
 let downBtn = menuTree[0];
 let purgeBtn = menuTree[1];
 let optionsBtn = menuTree[2];
+
 let optionsEntries = optionsPane.querySelectorAll('[name]');
 let remoteBtn = optionsPane.querySelector('button');
 let downEntry = downPane.querySelector('textarea');
@@ -331,21 +340,44 @@ taskFilters(
     (array) => localStorage.setItem('queue', JSON.stringify(array))
 );
 
-menuEvents['popup_newdld'] = function() {
-    downBtn.classList.toggle('checked');
-    downPane.classList.toggle('hidden');
-    optionsBtn.classList.remove('checked');
-    optionsPane.classList.add('hidden');
-    jsonrpcPane.classList.add('hidden');
-};
+menuPane.addEventListener('click', async (event) => {
+    let menu = event.target.getAttribute('i18n');
 
-menuEvents['popup_options'] = function() {
-    optionsBtn.classList.toggle('checked');
-    optionsPane.classList.toggle('hidden');
-    downBtn.classList.remove('checked');
-    downPane.classList.add('hidden');
-    jsonrpcPane.classList.add('hidden');
-};
+    if (!menu) {
+        return;
+    }
+
+    if (menu === 'popup_newdld') {
+        downBtn.classList.toggle('checked');
+        downPane.classList.toggle('hidden');
+        optionsBtn.classList.remove('checked');
+        optionsPane.classList.add('hidden');
+        jsonrpcPane.classList.add('hidden');
+        return;
+    }
+
+    if (menu === 'popup_purge') {
+        await aria2.call('aria2.purgeDownloadResult');
+
+        for (let gid of aria2Queue.stopped) {
+            aria2Tasks[gid].remove();
+            delete aria2Tasks[gid];
+        }
+
+        aria2Queue.stopped = new Set();
+        aria2Stats.stopped.textContent = '0';
+        return;
+    }
+
+    if (menu === 'popup_options') {
+        optionsBtn.classList.toggle('checked');
+        optionsPane.classList.toggle('hidden');
+        downBtn.classList.remove('checked');
+        downPane.classList.add('hidden');
+        jsonrpcPane.classList.add('hidden');
+        return;
+    }
+});
 
 i18nEntry.addEventListener('change', (event) => {
     let locale = i18nEntry.value;
@@ -366,7 +398,7 @@ optionsPane.addEventListener('change', (event) => {
     localStorage.setItem(name, value);
     clearTimeout(updateStorage);
     updateStorage = setTimeout(() => {
-        aria2RPC.disconnect();
+        aria2.disconnect();
         optionsDispatch();
     }, 2500);
 });
@@ -383,72 +415,102 @@ jsonrpcPane.addEventListener('change', (event) => {
 
 function downloadURLs() {
     let urls = downEntry.value.match(/(https?:\/\/|ftp:\/\/|magnet:\?)[^\s\n]+/g);
+
     if (!urls) {
         downBtn.click();
         return;
     }
-    let options = { ...aria2Config };
-    let out = options.out;
-    options.out = urls.length !== 1 || !out ? null : out.replace(/[\\/:*?"<>|]/g, '_');
+
     let params = [];
-    for (let i = 0, l = urls.length; i < l; i++) {
-        params.push({ method: 'aria2.addUri', params: [ [urls[i] ], options] });
+    let index = urls.length;
+    let out = aria2Config.out;
+
+    if (index !== 1 || !out) {
+        aria2Config['out'] = null;
+    } else {
+        aria2Config['out'] = out.replace(/[\\/:*?"<>|]/g, '_');
     }
-    aria2RPC.multicall(params).then(() => {
+
+    for (let i = 0; i < index; i++) {
+        params[i] = { methodName: 'aria2.addUri', params: [[urls[i]], aria2Config] };
+    }
+
+    aria2.multicall(params).then(() => {
         downBtn.click();
     });
 }
 
 async function downloadFiles(files) {
-    let options = { ...aria2Config };
-    let datas = [];
-    options['out'] = options['referer'] = options['user-agent'] = null;
+    let tasks = [];
+    let config = aria2Config;
+
+    config['out'] = null;
+    config['referer'] = null;
+    config['user-agent'] = null;
+
     for (let i = 0, l = files.length; i < l; i++) {
         let file = files[i];
         let name = file.name;
-        let method;
-        let params = [options];
+        let methodName;
+        let params;
+
         if (name.endsWith('.torrent')) {
-            method = 'aria2.addTorrent';
-            params.unshift([]);
+            methodName = 'aria2.addTorrent';
+            params = [[], aria2Config];
         } else if (name.endsWith('.meta4') || name.endsWith('.metalink')) {
-            method = 'aria2.addMetalink';
+            methodName = 'aria2.addMetalink';
+            params = [aria2Config];
         } else {
             continue;
         }
-        datas.push(new Promise((resolve) => {
+
+        tasks.push(new Promise((resolve) => {
             let reader = new FileReader();
+
             reader.onload = (event) => {
-                let result = reader.reader;
-                params.unshift(result.substring(result.indexOf(',') + 1));
-                resolve({ method: params });
+                let result = reader.result;
+                let base64 = result.substring(result.indexOf(',') + 1);
+                params.unshift(base64);
+                resolve({ methodName, params });
             };
+
             reader.readAsDataURL(file);
         }));
     }
-    let params = await Promise.all(datas);
-    aria2RPC.multicall(params).then(() => {
+
+    let params = await Promise.all(tasks);
+    aria2.multicall(params).then(() => {
         downBtn.click();
     });
 }
 
-const downEvents = {
-    'down-url': downloadURLs,
-    'down-file': () => metaFiles.click(),
-    'all-proxy': (event) => event.target.previousElementSibling.value = aria2Storage.get('proxy')
-};
-
 downPane.addEventListener('click', (event) => {
-    let entry = event.target;
-    let id = entry.id;
-    if (id || entry.localName === 'button') {
-        downEvents[id](event);
+    let menu = event.target.id;
+
+    if (!menu) {
+        return;
+    }
+
+    if (menu === 'down-urls') {
+        downloadURLs();
+        return;
+    }
+
+    if (menu === 'down-files') {
+        metaFiles.click();
+        return;
+    }
+
+    if (menu === 'all-proxy') {
+        event.target.previousElementSibling.value = aria2Storage.get('proxy');
+        return;
     }
 });
 
 downPane.addEventListener('change', (event) => {
     let entry = event.target;
     let name = entry.name;
+
     if (name) {
         aria2Config[name] = entry.value;
     } else if (files) {
@@ -477,20 +539,22 @@ const optionsDefault = {
 
 function getOptionValue(key) {
     let value = localStorage.getItem(key);
+
     if (value === null) {
         return optionsDefault[key];
     }
+
     return value;
 }
 
 function optionsDispatch() {
-    aria2RPC.url = aria2Storage.get('url');
-    aria2RPC.secret = aria2Storage.get('secret');
-    aria2RPC.retries = aria2Storage.get('retries');
-    aria2RPC.timeout = aria2Storage.get('timeout');
+    aria2.url = aria2Storage.get('url');
+    aria2.secret = aria2Storage.get('secret');
+    aria2.retries = aria2Storage.get('retries');
+    aria2.timeout = aria2Storage.get('timeout');
     aria2Proxy = aria2Storage.get('proxy');
     aria2Delay = aria2Storage.get('interval') * 1000;
-    aria2RPC.connect();
+    aria2.connect();
 }
 
 const i18nLang = new Set(['en-US', 'zh-CN']);
@@ -506,6 +570,7 @@ async function i18nUserInterface(lang) {
         let el = i18nText[i];
         let key = el.getAttribute('i18n');
         let i18n = i18nJSON[key];
+
         if (key) {
             el.textContent = i18n;
         }
@@ -515,87 +580,88 @@ async function i18nUserInterface(lang) {
         let el = i18nTips[i];
         let key = el.getAttribute('i18n-tips')
         let i18n = i18nJSON[key];
+
         if (key) {
             el.title = i18n;
         }
     }
 
-    i18nCss.textContent = `
-#menu::before {
-    content: "${i18nJSON.popup_menu}";
-}
+    i18nCss.textContent = 
+  '#menu::before {'
++    ' content: "' + i18nJSON.popup_menu + '";'
++ '}'
 
-#filter::before {
-    content: "${i18nJSON.popup_queue}";
-}
++ '#filter::before {'
++    ' content: "' + i18nJSON.popup_queue + '";'
++ '}'
 
-#system::before {
-    content: "${i18nJSON.popup_system}";
-}
++ '#system::before {'
++    'content: "' + i18nJSON.popup_system + '";'
++ '}'
 
-#version::before {
-    content: "${i18nJSON.popup_version}";
-}
++ '#version::before {'
++    ' content: "' + i18nJSON.popup_version + '";'
++ '}'
 
-#download::before {
-    content: "${i18nJSON.popup_download}";
-}
++ '#download::before {'
++    'content: "' + i18nJSON.popup_download + '";'
++ '}'
 
-#upload::before {
-    content: "${i18nJSON.popup_upload}";
-}
++ '#upload::before {'
++    'content: "' + i18nJSON.popup_upload + '";'
++ '}'
 
-#active::before {
-    content: "${i18nJSON.popup_active}";
-}
++ '#active::before {'
++    'content: "' + i18nJSON.popup_active + '";'
++ '}'
 
-#waiting::before {
-    content: "${i18nJSON.popup_waiting}";
-}
++ '#waiting::before {'
++    'content: "' + i18nJSON.popup_waiting + '";'
++ '}'
 
-#stopped::before {
-    content: "${i18nJSON.popup_stopped}";
-}
++ '#stopped::before {'
++    'content: "' + i18nJSON.popup_stopped + '";'
++ '}'
 
-.day:not(:empty)::after {
-    content: "${i18nJSON.time_day}";
-}
++ '.day:not(:empty)::after {'
++    'content: "' + i18nJSON.time_day + '";'
++ '}'
 
-.hour:not(:empty)::after {
-    content: "${i18nJSON.time_hour}";
-}
++ '.hour:not(:empty)::after {'
++    'content: "' + i18nJSON.time_hour + '";'
++ '}'
 
-.minute:not(:empty)::after {
-    content: "${i18nJSON.time_minute}";
-}
++ '.minute:not(:empty)::after {'
++    'content: "' + i18nJSON.time_minute + '";'
++ '}'
 
-.second:not(:empty)::after {
-    content: "${i18nJSON.time_second}";
-}
++ '.second:not(:empty)::after {'
++    'content: "' + i18nJSON.time_second + '";'
++ '}'
 
-.sample::before {
-    content: "${i18nJSON.options_sample}";
-    text-decoration: underline;
-}
++ '.sample::before {'
++    'content: "' + i18nJSON.options_sample + '";'
++    'text-decoration: underline;'
++ '}'
 
-.default::before {
-    content: "${i18nJSON.options_default} = ";
-}
++ '.default::before {'
++    'content: "' + i18nJSON.options_default + '";'
++ '}'
 
-.disabled::before {
-    content: "${i18nJSON.options_disabled} = ";
-}
-`;
++ '.disabled::before {'
++    'content: "' + i18nJSON.options_disabled + '";'
++ '}';
 }
 
 (function () {
     let locale = getOptionValue('locale');
     i18nEntry.value = locale;
     i18nUserInterface(locale);
-    let old_onopen = aria2RPC.onopen;
-    aria2RPC.onopen = () => {
-        old_onopen();
-        aria2RPC.call('aria2.getGlobalOption').then((response) => {
+
+    let old_onopen = aria2.onopen;
+    aria2.onopen = () => {
+        aria2.call('aria2.getGlobalOption').then((response) => {
+            old_onopen();
             let config = response.result;
             config['disk-cache'] = getFileSize(config['disk-cache']);
             config['min-split-size'] = getFileSize(config['min-split-size']);
@@ -613,14 +679,18 @@ async function i18nUserInterface(lang) {
             downBtn.disabled = remoteBtn.disabled = true;
         });
     };
+
     for (let i = 0, l = optionsEntries.length; i < l; i++) {   
         let entry = optionsEntries[i];
         let name = entry.name;
         let value = entry.value = getOptionValue(name);
+
         if (entry.type === 'number') {
            value = entry.value | 0;
         }
+
         aria2Storage.set(name, value);
     }
+
     optionsDispatch();
 })();
