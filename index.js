@@ -423,7 +423,7 @@ function downloadURLs() {
 
     let params = [];
     let index = urls.length;
-    let out = aria2Config.out;
+    let out = aria2Config['out'];
 
     if (index !== 1 || !out) {
         aria2Config['out'] = null;
@@ -442,11 +442,10 @@ function downloadURLs() {
 
 async function downloadFiles(files) {
     let tasks = [];
-    let config = aria2Config;
 
-    config['out'] = null;
-    config['referer'] = null;
-    config['user-agent'] = null;
+    aria2Config['out'] = null;
+    aria2Config['referer'] = null;
+    aria2Config['user-agent'] = null;
 
     for (let i = 0, l = files.length; i < l; i++) {
         let file = files[i];
