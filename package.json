@@ -18,15 +18,7 @@
         },
         "publish": null,
         "files": [
-            "app.js",
-            "aria2.js",
-            "index.html",
-            "index.js",
-            "popup.js",
-            "popup.css",
-            "common.css",
-            "i18n/*.json",
-            "package.json"
+            "**/*"
         ]
     }
 }
