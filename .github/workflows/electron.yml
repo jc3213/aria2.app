@@ -96,37 +96,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Prepare minified directory
-        run: |
-          rm -rf build-src
-          mkdir build-src
-          cp -r *.js *.json *.html *.css i18n build-src/ 2>/dev/null || true
-
-          node -e "
-            const fs = require('fs');
-            const root = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            const appPkg = {
-              name: root.name,
-              version: root.version,
-              main: root.main
-            };
-            fs.writeFileSync('build-src/package.json', JSON.stringify(appPkg, null, 4));
-          "
-
-      - name: Minify Source Files
-        run: |
-          minify_dir() {
-            DIR=$1
-            find "$DIR" -type f -name "*.html" -exec html-minifier-terser \
-              --collapse-whitespace --remove-comments --minify-css true --minify-js true \
-              -o {} {} \;
-            find "$DIR" -type f -name "*.js"   -exec terser --compress --mangle -o {} -- {} \;
-            find "$DIR" -type f -name "*.css"  -exec cleancss -o {} {} \;
-            find "$DIR" -type f -name "*.json" -exec node -e 'const fs=require("fs"); const f=process.argv[1]; const j=JSON.parse(fs.readFileSync(f,"utf8")); fs.writeFileSync(f, JSON.stringify(j));' {} \;
-          }
-
-          minify_dir build-src
-
       - name: Build Electron App
         run: npm run dist
 
