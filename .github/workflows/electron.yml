@@ -101,7 +101,17 @@ jobs:
           rm -rf build-src
           mkdir build-src
           cp -r *.js *.json *.html *.css i18n build-src/ 2>/dev/null || true
-          # app.js / index.html / index.js 已包含在 *.js / *.html 里
+
+          node -e "
+            const fs = require('fs');
+            const root = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const appPkg = {
+              name: root.name,
+              version: root.version,
+              main: root.main
+            };
+            fs.writeFileSync('build-src/package.json', JSON.stringify(appPkg, null, 4));
+          "
 
       - name: Minify Source Files
         run: |
