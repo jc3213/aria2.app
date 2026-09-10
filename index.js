@@ -1,45 +1,3 @@
-const hotkeyMap = document.querySelectorAll('[hotkey]')
-const hotkeyCombo = {};
-
-for (let i = 0, l = hotkeyMap.length; i < l; i++) {
-    let el = hotkeyMap[i];
-    let keys = el.getAttribute('hotkey').toLowerCase().split('\n');
-
-    for (let j = 0, m = keys.length; j < m; j++) {
-        let k = keys[j].trim();
-
-        if (k) {
-            hotkeyCombo[k] = el;
-        }
-    }
-}
-
-document.addEventListener('keydown', (event) => {
-    let keys = [];
-
-    if (event.ctrlKey) {
-        keys.push('ctrl');
-    }
-
-    if (event.altKey) {
-        keys.push('alt');
-    }
-
-    if (event.shiftKey) {
-        keys.push('shift');
-    }
-
-    keys.push(event.key.toLowerCase());
-
-    let combo = keys.join('+');
-    let hotkey = hotkeyCombo[combo];
-
-    if (hotkey) {
-        event.preventDefault();
-        hotkey.click();
-    }
-});
-
 const optionsPane = document.createElement('div');
 optionsPane.id = 'setting';
 optionsPane.className = 'config hidden';
@@ -335,7 +293,7 @@ let downEntry = downPane.querySelector('textarea');
 let metaFiles = downPane.querySelector('input[type="file"]');
 let remoteEntries = [ ...jsonrpcPane.querySelectorAll('[name]'), ...downPane.querySelectorAll('[name]') ];
 
-taskFilters(
+taskQueues(
     JSON.parse(localStorage.getItem('queue')) || [],
     (array) => localStorage.setItem('queue', JSON.stringify(array))
 );
@@ -360,8 +318,8 @@ menuPane.addEventListener('click', async (event) => {
         await aria2.call('aria2.purgeDownloadResult');
 
         for (let gid of aria2Queue.stopped) {
-            aria2Tasks[gid].remove();
-            delete aria2Tasks[gid];
+            aria2Tasks.get(gid).remove();
+            aria2Tasks.delete(gid);
         }
 
         aria2Queue.stopped = new Set();
@@ -590,7 +548,7 @@ async function i18nUserInterface(lang) {
 +    ' content: "' + i18nJSON.popup_menu + '";'
 + '}'
 
-+ '#filter::before {'
++ '#queues::before {'
 +    ' content: "' + i18nJSON.popup_queue + '";'
 + '}'
 
