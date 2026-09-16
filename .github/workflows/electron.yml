@@ -27,7 +27,7 @@ jobs:
 
       - name: Detect asset changes
         id: filter
-        uses: dorny/paths-filter@v7
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             assets:
