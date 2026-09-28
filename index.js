@@ -322,7 +322,7 @@ menuPane.addEventListener('click', async (event) => {
             aria2Tasks.delete(gid);
         }
 
-        aria2Queue.stopped = new Set();
+        aria2Queue.stopped.clear();
         aria2Stats.stopped.textContent = '0';
         return;
     }
@@ -349,12 +349,16 @@ optionsPane.addEventListener('change', (event) => {
     let entry= event.target;
     let name = entry.name;
     let value = entry.value;
+
     if (entry.type === 'number') {
         value = value | 0;
     }
+
     aria2Storage.set(name, value);
     localStorage.setItem(name, value);
+
     clearTimeout(updateStorage);
+
     updateStorage = setTimeout(() => {
         aria2.disconnect();
         optionsDispatch();
@@ -436,6 +440,7 @@ async function downloadFiles(files) {
     }
 
     let params = await Promise.all(tasks);
+
     aria2.multicall(params).then(() => {
         downBtn.click();
     });
@@ -505,10 +510,18 @@ function getOptionValue(key) {
 }
 
 function optionsDispatch() {
+    aria2 = null;
+    
+    aria2 = new Aria2();
     aria2.url = aria2Storage.get('url');
     aria2.secret = aria2Storage.get('secret');
     aria2.retries = aria2Storage.get('retries');
     aria2.timeout = aria2Storage.get('timeout');
+
+    aria2.onopen = managerStart;
+    aria2.onclose = jsonrpcError;
+    aria2.onmessage = jsonrpcMessage;
+
     aria2Proxy = aria2Storage.get('proxy');
     aria2Delay = aria2Storage.get('interval') * 1000;
     aria2.connect();
@@ -610,33 +623,31 @@ async function i18nUserInterface(lang) {
 + '}';
 }
 
-(function () {
-    let locale = getOptionValue('locale');
-    i18nEntry.value = locale;
-    i18nUserInterface(locale);
+function managerStart() {
+    aria2.call('aria2.getGlobalOption').then((response) => {
+        let config = response.result;
 
-    let old_onopen = aria2.onopen;
-    aria2.onopen = () => {
-        aria2.call('aria2.getGlobalOption').then((response) => {
-            old_onopen();
-            let config = response.result;
-            config['disk-cache'] = getFileSize(config['disk-cache']);
-            config['min-split-size'] = getFileSize(config['min-split-size']);
-            config['max-upload-limit'] = getFileSize(config['max-upload-limit']);
-            for (let i = 0, l = remoteEntries.length; i < l; i++) {
-                let entry = remoteEntries[i];
-                let name = entry.name;
-                let value = config[name];
-                if (value) {
-                    entry.value = aria2Config[name] = value;
-                }
+        config['disk-cache'] = getFileSize(config['disk-cache']);
+        config['min-split-size'] = getFileSize(config['min-split-size']);
+        config['max-upload-limit'] = getFileSize(config['max-upload-limit']);
+
+        for (let i = 0, l = remoteEntries.length; i < l; i++) {
+            let entry = remoteEntries[i];
+            let name = entry.name;
+            let value = config[name];
+            if (value) {
+                entry.value = aria2Config[name] = value;
             }
-            downBtn.disabled = remoteBtn.disabled = false;
-        }).catch(() => {
-            downBtn.disabled = remoteBtn.disabled = true;
-        });
-    };
+        }
 
+        downBtn.disabled = remoteBtn.disabled = false;
+        jsonrpcStart();
+    }).catch(() => {
+        downBtn.disabled = remoteBtn.disabled = true;
+    });
+}
+
+(function () {
     for (let i = 0, l = optionsEntries.length; i < l; i++) {   
         let entry = optionsEntries[i];
         let name = entry.name;
@@ -650,4 +661,8 @@ async function i18nUserInterface(lang) {
     }
 
     optionsDispatch();
+
+    let locale = getOptionValue('locale');
+    i18nEntry.value = locale;
+    i18nUserInterface(locale);
 })();
