@@ -12,23 +12,42 @@ const aria2 = (() => {
     let onmessage = null;
     let onclose = null;
 
-    function open() {
-        if (socket) {
-            let readyState = socket.readyState;
+    function abort() {
+        if (pending.size === 0) {
+            return;
+        }
 
+        for (let session of pending.values()) {
+            session.reject(new Error('WebSocket error: connection closed'));
+        }
+
+        pending.clear();
+    }
+
+    function connect() {
+        if (socket) {
             if (socket.url === url) {
-                if (readyState === 0) {
-                    throw new Error('WebSocket error: connection is still in CONNECTING state');
-                }
-                if (readyState === 1) {
+                let state = socket.readyState;
+
+                if (state === WebSocket.OPEN) {
+                    if (onopen) {
+                        onopen();
+                    }
+
                     return;
                 }
-            }
 
-            socket.onopen = null;
-            socket.onmessage = null;
-            socket.onclose = null;
-            socket.close();
+                if (state === WebSocket.CONNECTING) {
+                    throw new Error('WebSocket error: still in CONNECTING state');
+                }
+
+                socket.onopen = null;
+                socket.onmessage = null;
+                socket.onclose = null;
+                socket.onerror = null;
+            } else {
+                disconnect();
+            }
         }
 
         socket = new WebSocket(url);
@@ -60,24 +79,35 @@ const aria2 = (() => {
         };
 
         socket.onclose = (event) => {
-            if (pending.size > 0) {
-                for (let session of pending.values()) {
-                    session.reject(new Error('WebSocket error: connection closed'));
-                }
-
-                pending.clear();
-            }
+            abort();
 
             if (onclose) {
                 onclose(event);
             }
 
             if (tries++ < retries) {
-                tick = setTimeout(open, timeout);
+                tick = setTimeout(connect, timeout);
             } else {
                 tries = 0;
             }
         };
+    }
+
+    function disconnect() {
+        if (!socket) {
+            return;
+        }
+
+        let state = socket.readyState;
+
+        if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) {
+            socket.onopen = null;
+            socket.onmessage = null;
+            socket.onclose = null;
+            socket.onerror = null;
+            socket.close();
+            abort();
+        }
     }
 
     return {
@@ -211,16 +241,13 @@ const aria2 = (() => {
         connect() {
             clearTimeout(tick);
             tries = 0;
-            open();
+            connect();
         },
 
         disconnect() {
             clearTimeout(tick);
             tries = Infinity;
-
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.close();
-            }
+            disconnect();
         }
     };
 })();
