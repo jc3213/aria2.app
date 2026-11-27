@@ -37,7 +37,7 @@ jobs:
       - name: Fetch external JS/CSS
         if: steps.filter.outputs.assets == 'true'
         run: |
-          curl -L -o aria2.js https://raw.githubusercontent.com/jc3213/aria2.js/refs/heads/main/src/aria2.js
+          curl -L -o aria2.js https://github.com/jc3213/aria2.js/raw/refs/heads/main/singleton/aria2.iife.js
           curl -L -o common.css https://raw.githubusercontent.com/jc3213/download_with_aria2/refs/heads/main/chromium/pages/common.css
           curl -L -o popup.css https://raw.githubusercontent.com/jc3213/download_with_aria2/refs/heads/main/chromium/pages/popup.css
           curl -L -o popup.js https://raw.githubusercontent.com/jc3213/download_with_aria2/refs/heads/main/chromium/pages/popup.js
