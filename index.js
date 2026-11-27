@@ -298,6 +298,10 @@ taskQueues(
     (array) => localStorage.setItem('queue', JSON.stringify(array))
 );
 
+aria2.onopen = managerStart;
+aria2.onclose = jsonrpcError;
+aria2.onmessage = jsonrpcMessage;
+
 menuPane.addEventListener('click', async (event) => {
     let menu = event.target.getAttribute('i18n');
 
@@ -510,17 +514,10 @@ function getOptionValue(key) {
 }
 
 function optionsDispatch() {
-    aria2 = null;
-    
-    aria2 = new Aria2();
     aria2.url = aria2Storage.get('url');
     aria2.secret = aria2Storage.get('secret');
     aria2.retries = aria2Storage.get('retries');
     aria2.timeout = aria2Storage.get('timeout');
-
-    aria2.onopen = managerStart;
-    aria2.onclose = jsonrpcError;
-    aria2.onmessage = jsonrpcMessage;
 
     aria2Proxy = aria2Storage.get('proxy');
     aria2Delay = aria2Storage.get('interval') * 1000;
