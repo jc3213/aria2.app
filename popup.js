@@ -423,9 +423,9 @@ async function taskRemove(task, gid) {
 }
 
 const taskPauseMap = {
-    'active': { method: 'aria2.forcePause', status: 'paused' },
-    'waiting': { method: 'aria2.pause', status: 'paused' },
-    'paused': { method: 'aria2.unpause', status: 'waiting' }
+    'active': 'aria2.forcePause',
+    'waiting': 'aria2.pause',
+    'paused': 'aria2.unpause'
 };
 
 async function taskPause(task, gid) {
@@ -436,11 +436,14 @@ async function taskPause(task, gid) {
         return;
     }
 
-    let method = action.method;
-    let newsts = action.status;
+    let response = await aria2.multicall([
+        { methodName: action, params: [gid] },
+        { methodName: 'aria2.tellStatus', params: [gid, ['status']] }
+    ]);
+
+    let newsts = response.result[1][0].status;
     task.classList.replace(oldsts, newsts);
     task.status = newsts;
-    await aria2.call(method, [gid]);
 }
 
 async function getDetails(gid) {
@@ -469,9 +472,9 @@ async function taskDetails(task, gid, config, checks, entries, detail, apply) {
         detailList.remove('checked');
         classList.remove('expand');
     } else {
-        let result = await getDetails(gid);
-        let files = result.files;
-        let options = result.options;
+        let details = await getDetails(gid);
+        let files = details.files;
+        let options = details.options;
 
         for (let i = 0, l = files.length; i < l; i++) {
             let file = files[i];
@@ -517,10 +520,10 @@ async function taskRetry(task, gid) {
     let file = result.files[0];
     let path = file.path;
     let uris = file.uris;
-    let url = [];
+    let urls = [];
 
     for (let i = 0, l = uris.length; i < l; i++) {
-        url.push(uris[i].uri);
+        urls.push(uris[i].uri);
     }
 
     if (path) {
@@ -533,7 +536,7 @@ async function taskRetry(task, gid) {
     }
 
     let response = await aria2.multicall([
-        { methodName: 'aria2.addUri', params: [url, options] },
+        { methodName: 'aria2.addUri', params: [urls, options] },
         { methodName: 'aria2.removeDownloadResult', params: [gid] }
     ]);
 
@@ -548,16 +551,17 @@ async function taskUriAdd(task, gid, entry) {
     entry.value = '';
 
     let response = await aria2.call('aria2.changeUri', [gid, 1, [], [url]]);
+    let result = response.result;
 
-    if (response.result && response.result[1] === 1) {
+    if (result && result[1] === 1) {
         task.align = true;
         task[url] = createTaskUri(task, url);
     }
 }
 
 async function taskUriRemove(task, gid, event) {
-    let result = await getDetails(gid);
-    let uris = result.files[0].uris;
+    let details = await getDetails(gid);
+    let uris = details.files[0].uris;
     let url = event.target.previousElementSibling.textContent;
     let removed = [];
 
@@ -568,8 +572,9 @@ async function taskUriRemove(task, gid, event) {
     }
 
     let response = await aria2.call('aria2.changeUri', [gid, 1, removed, []]);
+    let result = response.result;
 
-    if (response.result && response.result[0] === removed.length) {
+    if (result && result[0] === removed.length) {
         task.align = true;
         delete task[url];
         event.target.parentNode.remove();

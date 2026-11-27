@@ -1,125 +1,18 @@
-class Aria2 {
-    #url;
-    #xml;
-    #wsa;
-    #secret;
-    #socket;
-    #id = 0;
-    #tries = 0;
-    #retries = 10;
-    #timeout = 10000;
-    #timer;
-    #pending = new Map();
-    #onopen = null;
-    #onmessage = null;
-    #onclose = null;
-    #ready = false;
-    #call;
+const aria2 = (() => {
+    let url = 'ws://localhost:6800/jsonrpc';
+    let secret = '';
+    let socket = null;
+    let id = 0;
+    let tries = 0;
+    let retries = 10;
+    let timeout = 10000;
+    let tick = 0;
+    let pending = new Map();
+    let onopen = null;
+    let onmessage = null;
+    let onclose = null;
 
-    constructor(url, secret) {
-        if (!url) {
-            this.url = 'http://localhost:6800/jsonrpc';
-            this.secret = '';
-        } else {
-            let i = url.indexOf('#');
-
-            if (i !== -1) {
-                this.url = url.substring(0, i);
-                this.secret = url.substring(i + 1);
-            } else {
-                this.url = url;
-                this.secret = secret || '';
-            }
-        }
-
-        this.#call = this.#post;
-    }
-
-    set url(string) {
-        if (string.startsWith('http://') || string.startsWith('https://')) {
-            this.#url = this.#xml = string;
-            this.#wsa = 'ws' + string.substring(4);
-        } else if (string.startsWith('ws://') || string.startsWith('wss://')) {
-            this.#xml = 'http' + string.substring(2);
-            this.#url = this.#wsa = string;
-        } else {
-            throw new TypeError('Invalid URL: expected a valid http(s):// or ws(s):// URL');
-        }
-    }
-    get url() {
-        return this.#url;
-    }
-
-    set secret(string) {
-        this.#secret = 'token:' + string;
-    }
-    get secret() {
-        return this.#secret.substring(6);
-    }
-
-    set retries(number) {
-        let n = number | 0;
-
-        if (n < 0) {
-            this.#retries = Infinity;
-        } else {
-            this.#retries = n;
-        }
-    }
-    get retries() {
-        return this.#retries;
-    }
-
-    set timeout(number) {
-        let n = number | 0;
-
-        if (n > 1) {
-            this.#timeout = n * 1000;
-        } else {
-            this.#timeout = 1000;
-        }
-    }
-    get timeout() {
-        return this.#timeout / 1000;
-    }
-
-    set onopen(callback) {
-        if (typeof callback === 'function') {
-            this.#onopen = callback;
-        } else {
-            this.#onopen = null;
-        }
-    }
-    get onopen() {
-        return this.#onopen;
-    }
-
-    set onmessage(callback) {
-        if (typeof callback === 'function') {
-            this.#onmessage = callback;
-        } else {
-            this.#onmessage = null;
-        }
-    }
-    get onmessage() {
-        return this.#onmessage;
-    }
-
-    set onclose(callback) {
-        if (typeof callback === 'function') {
-            this.#onclose = callback;
-        } else {
-            this.#onclose = null;
-        }
-    }
-    get onclose() {
-        return this.#onclose;
-    }
-
-    #open() {
-        let socket = this.#socket;
-        let url = this.#wsa;
-
+    function open() {
         if (socket) {
             let readyState = socket.readyState;
 
@@ -139,14 +32,9 @@ class Aria2 {
         }
 
         socket = new WebSocket(url);
-        this.#socket = socket;
 
         socket.onopen = (event) => {
-            this.#call = this.#send;
-            this.#ready = true;
-            this.#tries = 0;
-
-            let onopen = this.#onopen;
+            tries = 0;
 
             if (onopen) {
                 onopen(event);
@@ -158,7 +46,6 @@ class Aria2 {
             let id = json.id;
 
             if (id !== undefined) {
-                let pending = this.#pending;
                 let session = pending.get(id);
 
                 if (session) {
@@ -166,8 +53,6 @@ class Aria2 {
                     session.resolve(json);
                 }
             } else {
-                let onmessage = this.#onmessage;
-
                 if (onmessage) {
                     onmessage(json);
                 }
@@ -175,11 +60,6 @@ class Aria2 {
         };
 
         socket.onclose = (event) => {
-            this.#call = this.#post;
-            this.#ready = false;
-
-            let pending = this.#pending;
-
             if (pending.size > 0) {
                 for (let session of pending.values()) {
                     session.reject(new Error('WebSocket error: connection closed'));
@@ -188,83 +68,159 @@ class Aria2 {
                 pending.clear();
             }
 
-            let onclose = this.#onclose;
-
             if (onclose) {
                 onclose(event);
             }
 
-            if (this.#tries++ < this.#retries) {
-                this.#timer = setTimeout(() => this.#open(), this.#timeout);
+            if (tries++ < retries) {
+                tick = setTimeout(open, timeout);
             } else {
-                this.#tries = 0;
+                tries = 0;
             }
         };
     }
 
-    #send(json) {
-        return new Promise((resolve, reject) => {
-            if (!this.#ready) {
-                throw new Error('WebSocket error: failed to send message');
+    return {
+        set url(string) {
+            if (string.startsWith('http://') || string.startsWith('https://')) {
+                url = 'ws' + string.substring(4);
+            } else if (string.startsWith('ws://') || string.startsWith('wss://')) {
+                url = string;
+            } else {
+                throw new TypeError('Invalid URL: expected a valid ws(s):// URL');
+            }
+        },
+        get url() {
+            return url;
+        },
+
+        set secret(string) {
+            secret = 'token:' + string;
+        },
+        get secret() {
+            return secret.substring(6);
+        },
+
+        set retries(number) {
+            let n = number | 0;
+
+            if (n < 0) {
+                retries = Infinity;
+            } else {
+                retries = n;
+            }
+        },
+        get retries() {
+            return retries;
+        },
+
+        set timeout(number) {
+            let n = number | 0;
+
+            if (n > 1) {
+                timeout = n * 1000;
+            } else {
+                timeout = 1000;
+            }
+        },
+        get timeout() {
+            return timeout / 1000;
+        },
+
+        get ready() {
+            if (!socket) {
+                return false;
             }
 
-            this.#pending.set(json.id, { resolve, reject });
-            this.#socket.send(JSON.stringify(json));
-        });
-    }
+            return socket.readyState === WebSocket.OPEN;
+        },
 
-    #post(json) {
-        return fetch(this.#xml, { method: 'POST', body: JSON.stringify(json) }).then((response) => {
-            if (response.ok) {
-                return response.json();
+        set onopen(callback) {
+            if (typeof callback === 'function') {
+                onopen = callback;
+            } else {
+                onopen = null;
             }
+        },
+        get onopen() {
+            return onopen;
+        },
 
-            throw new Error('Network error: ' + response.status + ' ' + response.statusText);
-        });
-    }
+        set onmessage(callback) {
+            if (typeof callback === 'function') {
+                onmessage = callback;
+            } else {
+                onmessage = null;
+            }
+        },
+        get onmessage() {
+            return onmessage;
+        },
 
-    call(method, params) {
-        if (params) {
-            params = [this.#secret].concat(params);
-        } else {
-            params = [this.#secret];
-        }
+        set onclose(callback) {
+            if (typeof callback === 'function') {
+                onclose = callback;
+            } else {
+                onclose = null;
+            }
+        },
+        get onclose() {
+            return onclose;
+        },
 
-        return this.#call({ jsonrpc: '2.0', id: this.#id++, method, params });
-    }
+        send(json) {
+            return new Promise((resolve, reject) => {
+                if (socket.readyState !== WebSocket.OPEN) {
+                    throw new Error('WebSocket error: failed to send message');
+                }
 
-    multicall(args) {
-        let calls = [];
-        let secret = this.#secret;
+                pending.set(json.id, { resolve, reject });
+                socket.send(JSON.stringify(json));
+            });
+        },
 
-        for (let i = 0, l = args.length; i < l; i++) {
-            let arg = args[i];
-            let params = arg.params;
-
+        call(method, params) {
             if (params) {
                 params = [secret].concat(params);
             } else {
                 params = [secret];
             }
 
-            calls[i] = { methodName: arg.methodName, params };
+            return this.send({ jsonrpc: '2.0', id: id++, method, params });
+        },
+
+        multicall(args) {
+            let calls = [];
+
+            for (let i = 0, l = args.length; i < l; i++) {
+                let arg = args[i];
+                let params = arg.params;
+
+                if (params) {
+                    params = [secret].concat(params);
+                } else {
+                    params = [secret];
+                }
+
+                calls[i] = { methodName: arg.methodName, params };
+            }
+
+            return this.send({ jsonrpc: '2.0', id: id++, method: 'system.multicall', params: [calls] });
+        },
+
+        connect() {
+            clearTimeout(tick);
+            tries = 0;
+            open();
+        },
+
+        disconnect() {
+            clearTimeout(tick);
+            tries = Infinity;
+
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
         }
-
-        return this.#call({ jsonrpc: '2.0', id: this.#id++, method: 'system.multicall', params: [calls] });
-    }
-
-    connect() {
-        clearTimeout(this.#timer);
-        this.#tries = 0;
-        this.#open();
-    }
-
-    disconnect() {
-        clearTimeout(this.#timer);
-        this.#tries = Infinity;
-
-        if (this.#ready) {
-            this.#socket.close();
-        }
-    }
-}
+    };
+})();
